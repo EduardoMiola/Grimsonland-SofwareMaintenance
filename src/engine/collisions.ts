@@ -9,12 +9,13 @@ export const bootstrapCollisions = (config: {
   width: number;
   height: number;
 }) => {
-  const n = config.n || DEFAULT_CELL_SHIFT;
+  // Each cell spans 2 ** cellShift pixels along each axis.
+  const cellShift = config.n || DEFAULT_CELL_SHIFT;
   const width = config.width || DEFAULT_WIDTH;
   const height = config.height || DEFAULT_HEIGHT;
-  const sizeX = width >> n;
-  const sizeY = height >> n;
-  const cellGrid = new Array(sizeX * sizeY);
+  const columns = width >> cellShift;
+  const rows = height >> cellShift;
+  const cellGrid: GameObject[][] = new Array(columns * rows);
 
   const generateMap = () => {
     for (let i = 0; i < cellGrid.length; i++) {
@@ -22,86 +23,83 @@ export const bootstrapCollisions = (config: {
     }
   };
 
-  const getCell = (point: number[]) => {
-    return point[0] + point[1] * sizeY;
+  const getCellIndex = (x: number, y: number) => x + y * rows;
+
+  const removeFromCell = (cellIndex: number, object: GameObject) => {
+    const cell = cellGrid[cellIndex];
+    if (cell) {
+      cell.splice(cell.indexOf(object), 1);
+    }
   };
 
   const removeObject = (object: GameObject) => {
     const oldCells = object.collisions.cells;
 
     for (let i = 0; i < oldCells.length; i++) {
-      cellGrid[oldCells[i]] &&
-        cellGrid[oldCells[i]].splice(cellGrid[oldCells[i]].indexOf(object), 1);
+      removeFromCell(oldCells[i], object);
     }
   };
 
-  const getPointsOfObject = (object: GameObject) => {
-    const pos = object.pos!;
-    const size = object.size!;
-    const cells = [];
-    const xIndex = size[0] >> n;
-    const yIndex = size[1] >> n;
+  const getObjectCells = (object: GameObject) => {
+    const position = object.pos!;
+    const [objectWidth, objectHeight] = object.size!;
+    const cells: number[] = [];
+    const horizontalSteps = objectWidth >> cellShift;
+    const verticalSteps = objectHeight >> cellShift;
 
-    for (let i = 0; i < 2 + xIndex; i++) {
-      for (let j = 0; j < 2 + yIndex; j++) {
-        cells.push(
-          getCell([
-            (pos.x - size[0] / 2 + i * (size[0] / (1 + xIndex))) >> n,
-            (pos.y - size[1] / 2 + j * (size[1] / (1 + yIndex))) >> n,
-          ])
-        );
+    for (let xStep = 0; xStep < 2 + horizontalSteps; xStep++) {
+      for (let yStep = 0; yStep < 2 + verticalSteps; yStep++) {
+        const x =
+          (position.x - objectWidth / 2 + xStep * (objectWidth / (1 + horizontalSteps))) >>
+          cellShift;
+        const y =
+          (position.y - objectHeight / 2 + yStep * (objectHeight / (1 + verticalSteps))) >>
+          cellShift;
+        cells.push(getCellIndex(x, y));
       }
     }
 
     return cells;
   };
 
-  const addToCell = (cell: number, object: GameObject) => {
-    cellGrid[cell] &&
-      cellGrid[cell].indexOf(object) === -1 &&
-      cellGrid[cell].push(object);
+  const addToCell = (cellIndex: number, object: GameObject) => {
+    const cell = cellGrid[cellIndex];
+    if (cell && cell.indexOf(object) === -1) {
+      cell.push(object);
+    }
   };
 
   const updateObject = (object: GameObject) => {
-    const cells = getPointsOfObject(object);
+    const cells = getObjectCells(object);
     const oldCells = object.collisions.cells;
 
     for (let i = 0; i < cells.length; i++) {
       if (oldCells[i] !== cells[i]) {
-        cellGrid[oldCells[i]] &&
-          cellGrid[oldCells[i]].splice(
-            cellGrid[oldCells[i]].indexOf(object),
-            1
-          );
-        addToCell(cells[i], object);
+        removeFromCell(oldCells[i], object);
         oldCells[i] = cells[i];
-      } else {
-        addToCell(cells[i], object);
       }
+      addToCell(cells[i], object);
     }
   };
 
   const checkCollisions = () => {
-    for (let i = 0; i <= sizeX; i++) {
-      for (let j = 0; j <= sizeY; j++) {
-        const objects = cellGrid[getCell([i, j])];
+    for (let x = 0; x <= columns; x++) {
+      for (let y = 0; y <= rows; y++) {
+        const objects = cellGrid[getCellIndex(x, y)];
         if (!objects) continue;
         const length = objects.length;
 
         for (let k = 0; k < length; k++) {
           for (let l = k + 1; l < length; l++) {
-            if (
-              boxCollides(
-                objects[k].pos,
-                objects[k].size,
-                objects[l].pos,
-                objects[l].size
-              )
-            ) {
-              objects[k].collisions.objects.indexOf(objects[l]) === -1 &&
-                objects[k].collisions.objects.push(objects[l]);
-              objects[l].collisions.objects.indexOf(objects[k]) === -1 &&
-                objects[l].collisions.objects.push(objects[k]);
+            const first = objects[k];
+            const second = objects[l];
+            if (boxCollides(first.pos, first.size!, second.pos, second.size!)) {
+              if (first.collisions.objects.indexOf(second) === -1) {
+                first.collisions.objects.push(second);
+              }
+              if (second.collisions.objects.indexOf(first) === -1) {
+                second.collisions.objects.push(first);
+              }
             }
           }
         }
@@ -140,9 +138,9 @@ export const bootstrapCollisions = (config: {
   generateMap();
 
   return {
-    cellGrid: cellGrid,
-    updateObject: updateObject,
-    removeObject: removeObject,
+    cellGrid,
+    updateObject,
+    removeObject,
     check: checkCollisions,
     clear: generateMap,
   };
