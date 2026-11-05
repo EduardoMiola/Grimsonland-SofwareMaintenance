@@ -1,64 +1,90 @@
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
-const Module = require('module');
-const ts = require('typescript');
+const { teste } = require('./apoio.cjs');
+const { bootstrapCollisions } = require('../src/engine/collisions.ts');
 
-// The collision module has only type imports, so it can be exercised without Phaser.
-const sourcePath = path.join(__dirname, '..', 'src', 'engine', 'collisions.ts');
-const source = fs.readFileSync(sourcePath, 'utf8');
-const compiled = ts.transpileModule(source, {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
-}).outputText;
-const moduleUnderTest = new Module(sourcePath, module);
-moduleUnderTest.filename = sourcePath;
-moduleUnderTest.paths = module.paths;
-moduleUnderTest._compile(compiled, sourcePath);
-const bootstrapCollisions = moduleUnderTest.exports.bootstrapCollisions;
-
-function object(name, x, y, size = 20) {
-  return { name, pos: { x, y }, size: [size, size], collisions: { cells: [], objects: [] } };
+// Criamos apenas os dados que o detector de colisões usa. Não são desenhos na tela.
+function objeto(nome, x, y, tamanho = 20) {
+  return {
+    nome,
+    pos: { x, y },
+    size: [tamanho, tamanho],
+    collisions: { cells: [], objects: [] },
+  };
+}
+function criarGrade() {
+  return bootstrapCollisions({ n: 6, width: 800, height: 600 });
+}
+function nomesEmContato(item) {
+  return item.collisions.objects.map(outro => outro.nome).sort();
 }
 
-function names(item) {
-  return item.collisions.objects.map(other => other.name).sort();
-}
+teste('objetos sobrepostos entram na lista um do outro; bordas apenas encostadas não', () => {
+  // Preparar: A cruza B; B cruza C; A e C só encostam pelas bordas.
+  const grade = criarGrade();
+  const a = objeto('A', 100, 100);
+  const b = objeto('B', 110, 100);
+  const c = objeto('C', 120, 100);
+  const distante = objeto('distante', 500, 400);
+  for (const item of [a, b, c, distante]) grade.updateObject(item);
 
-const grid = bootstrapCollisions({ n: 6, width: 800, height: 600 });
-const a = object('a', 100, 100);
-const b = object('b', 110, 100);
-const c = object('c', 120, 100);
-const d = object('d', 500, 400);
-for (const item of [a, b, c, d]) grid.updateObject(item);
-grid.check();
-assert.deepStrictEqual([names(a), names(b), names(c), names(d)], [['b'], ['a', 'c'], ['b'], []]);
+  // Agir: pedir ao jogo que identifique os contatos.
+  grade.check();
 
-for (const item of [a, b, c, d]) item.collisions.objects = [];
-b.pos.x = 500;
-b.pos.y = 400;
-grid.updateObject(b);
-grid.removeObject(c);
-grid.check();
-assert.deepStrictEqual([names(a), names(b), names(c), names(d)], [[], ['d'], [], ['b']]);
-grid.clear();
-assert.strictEqual(grid.cellGrid.reduce((count, cell) => count + cell.length, 0), 0);
+  // Conferir: o contato deve aparecer dos dois lados e sem incluir o distante.
+  assert.deepStrictEqual(nomesEmContato(a), ['B']);
+  assert.deepStrictEqual(nomesEmContato(b), ['A', 'C']);
+  assert.deepStrictEqual(nomesEmContato(c), ['B']);
+  assert.deepStrictEqual(nomesEmContato(distante), []);
+});
 
-// A pair of equal boxes overlaps exactly when both axis distances are below the size.
-let cases = 0;
-for (const size of [8, 20, 64, 80]) {
-  for (const dx of [-80, -64, -20, -8, 0, 8, 20, 64, 80]) {
-    for (const dy of [-20, 0, 20]) {
-      const pairGrid = bootstrapCollisions({ n: 6, width: 800, height: 600 });
-      const first = object('first', 250, 250, size);
-      const second = object('second', 250 + dx, 250 + dy, size);
-      pairGrid.updateObject(first);
-      pairGrid.updateObject(second);
-      pairGrid.check();
-      const expected = Math.abs(dx) < size && Math.abs(dy) < size;
-      assert.strictEqual(first.collisions.objects.includes(second), expected, `size=${size}, dx=${dx}, dy=${dy}`);
-      assert.strictEqual(second.collisions.objects.includes(first), expected, `reverse size=${size}, dx=${dx}, dy=${dy}`);
-      cases++;
+teste('ao mover e remover objetos, a grade usa suas novas posições', () => {
+  // Preparar: A e B começam próximos; C fica distante.
+  const grade = criarGrade();
+  const a = objeto('A', 100, 100);
+  const b = objeto('B', 110, 100);
+  const c = objeto('C', 500, 400);
+  for (const item of [a, b, c]) grade.updateObject(item);
+
+  // Agir: mover B para cima de C e retirar A da grade.
+  b.pos = { x: 500, y: 400 };
+  grade.updateObject(b);
+  grade.removeObject(a);
+  grade.check();
+
+  // Conferir: somente B e C devem colidir.
+  assert.deepStrictEqual(nomesEmContato(a), []);
+  assert.deepStrictEqual(nomesEmContato(b), ['C']);
+  assert.deepStrictEqual(nomesEmContato(c), ['B']);
+});
+
+teste('limpar a grade remove todos os objetos das células', () => {
+  const grade = criarGrade();
+  grade.updateObject(objeto('A', 100, 100));
+  grade.clear();
+  assert.strictEqual(grade.cellGrid.reduce((total, celula) => total + celula.length, 0), 0);
+});
+
+teste('colisão retangular funciona em 108 combinações de distância e tamanho', () => {
+  // Para quadrados iguais, há sobreposição somente se a distância em X e em Y
+  // for menor que o lado. A igualdade significa bordas encostadas, sem colisão.
+  let combinacoes = 0;
+  for (const tamanho of [8, 20, 64, 80]) {
+    for (const distanciaX of [-80, -64, -20, -8, 0, 8, 20, 64, 80]) {
+      for (const distanciaY of [-20, 0, 20]) {
+        const grade = criarGrade();
+        const primeiro = objeto('primeiro', 250, 250, tamanho);
+        const segundo = objeto('segundo', 250 + distanciaX, 250 + distanciaY, tamanho);
+        grade.updateObject(primeiro);
+        grade.updateObject(segundo);
+        grade.check();
+
+        const deveColidir = Math.abs(distanciaX) < tamanho && Math.abs(distanciaY) < tamanho;
+        const caso = `tamanho=${tamanho}, x=${distanciaX}, y=${distanciaY}`;
+        assert.strictEqual(primeiro.collisions.objects.includes(segundo), deveColidir, caso);
+        assert.strictEqual(segundo.collisions.objects.includes(primeiro), deveColidir, caso);
+        combinacoes++;
+      }
     }
   }
-}
-console.log(`Collision tests passed: movement, removal, clearing and ${cases} box combinations.`);
+  assert.strictEqual(combinacoes, 108);
+});
