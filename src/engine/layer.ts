@@ -212,6 +212,10 @@ export class GameLayer {
       default: [],
     };
     this.parameters = {};
+    this.objectsToBeRemoved = [];
+    this.translate = this.config.translate
+      ? { ...this.config.translate }
+      : { x: 0, y: 0 };
     this.inited = false;
   }
 }

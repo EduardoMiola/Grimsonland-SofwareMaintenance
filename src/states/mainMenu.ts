@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 const INFO_TEXT =
-  ' MOVING: WASD\n AIM: MOUSE\n CAST SPELL: MOUSE CLICK OR SPACE\n SELECT SPELL: 1, 2, 3.';
+  ' MOVING: WASD\n AIM: MOUSE\n CAST SPELL: MOUSE CLICK OR SPACE\n SELECT SPELL: 1, 2, 3, 4\n PAUSE: P OR ESC';
 
 export class MainMenu extends Phaser.State {
   private menuTheme!: Phaser.Sound;

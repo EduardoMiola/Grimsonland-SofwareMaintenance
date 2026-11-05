@@ -55,6 +55,11 @@ export class Battle extends Phaser.State {
   };
 
   private pauseFlag!: boolean;
+  private playerPaused = false;
+  private gameOver = false;
+  private pauseMenu!: Phaser.Group;
+  private audioText!: Phaser.Text;
+  private pauseKeys: Phaser.Key[] = [];
 
   init() {
     this.battleTheme = this.sound.add('battleTheme', 0.3, true);
@@ -63,6 +68,8 @@ export class Battle extends Phaser.State {
 
   create() {
     this.pauseFlag = false;
+    this.playerPaused = false;
+    this.gameOver = false;
 
     this.collisions = bootstrapCollisions({
       n: 6,
@@ -73,9 +80,102 @@ export class Battle extends Phaser.State {
     this.initGameParameters();
     this.initGameLayer();
     this.initControls();
+    this.initPauseControls();
 
     this.game.renderer.view.classList.add('no-pointer');
     this.battleTheme.play();
+  }
+
+  initPauseControls() {
+    this.pauseMenu = this.add.group();
+    const backdrop = this.add.graphics(0, 0);
+    backdrop.beginFill(0x000000, 0.8);
+    backdrop.drawRect(0, 0, this.game.width, this.game.height);
+    backdrop.endFill();
+    this.pauseMenu.add(backdrop);
+
+    const title = this.add.text(this.game.width / 2, 210, 'PAUSED', {
+      fontSize: '42px', fill: '#ffffff',
+    });
+    title.anchor.setTo(0.5, 0.5);
+    this.pauseMenu.add(title);
+
+    const option = (label: string, y: number, action: () => void) => {
+      const text = this.add.text(this.game.width / 2, y, label, {
+        fontSize: '26px', fill: '#ffffff',
+      });
+      text.anchor.setTo(0.5, 0.5);
+      text.inputEnabled = true;
+      text.events.onInputDown.add(action, this);
+      this.pauseMenu.add(text);
+      return text;
+    };
+    option('RESUME', 300, this.resumeGame);
+    option('RESTART', 350, this.restartFromPause);
+    option('MAIN MENU', 400, this.returnToMenu);
+    this.audioText = option('', 450, this.toggleAudio);
+    this.updateAudioLabel();
+    this.pauseMenu.visible = false;
+
+    const keyboard = this.game.input.keyboard;
+    this.pauseKeys = [keyboard.addKey(Phaser.Keyboard.P), keyboard.addKey(Phaser.Keyboard.ESC)];
+    this.pauseKeys.forEach((key) => key.onDown.add(this.togglePause, this));
+    keyboard.addKeyCapture([Phaser.Keyboard.P, Phaser.Keyboard.ESC]);
+  }
+
+  togglePause() {
+    if (this.gameOver) return;
+    if (this.playerPaused) this.resumeGame();
+    else this.pauseGame();
+  }
+
+  pauseGame() {
+    if (this.gameOver || this.playerPaused) return;
+    this.playerPaused = true;
+    this.pauseFlag = true;
+    this.sound.pauseAll();
+    this.pauseMenu.visible = true;
+    this.game.renderer.view.classList.remove('no-pointer');
+  }
+
+  resumeGame() {
+    if (!this.playerPaused || this.gameOver) return;
+    this.playerPaused = false;
+    this.pauseFlag = false;
+    this.pauseMenu.visible = false;
+    this.sound.resumeAll();
+    this.game.renderer.view.classList.add('no-pointer');
+  }
+
+  restartFromPause() {
+    if (!this.playerPaused) return;
+    this.resumeGame();
+    this.sound.stopAll();
+    this.restart();
+  }
+
+  returnToMenu() {
+    if (!this.playerPaused) return;
+    this.sound.stopAll();
+    this.playerPaused = false;
+    this.game.state.start('MainMenu');
+  }
+
+  toggleAudio() {
+    this.sound.mute = !this.sound.mute;
+    this.updateAudioLabel();
+  }
+
+  updateAudioLabel() {
+    this.audioText.text = this.sound.mute ? 'AUDIO: OFF' : 'AUDIO: ON';
+  }
+
+  shutdown() {
+    this.pauseKeys.forEach((key) => key.onDown.remove(this.togglePause, this));
+    this.pauseKeys = [];
+    this.game.input.keyboard.removeKeyCapture(Phaser.Keyboard.P);
+    this.game.input.keyboard.removeKeyCapture(Phaser.Keyboard.ESC);
+    this.game.renderer.view.classList.remove('no-pointer');
   }
 
   initControls() {
@@ -139,6 +239,7 @@ export class Battle extends Phaser.State {
   }
 
   stopBattle() {
+    this.gameOver = true;
     this.updateBestScores();
     this.battleTheme.stop();
     this.deathTheme.play();
@@ -181,6 +282,9 @@ export class Battle extends Phaser.State {
 
   restart() {
     this.pauseFlag = false;
+    this.playerPaused = false;
+    this.gameOver = false;
+    this.pauseMenu.visible = false;
 
     this.battleTheme.play();
     this.deathTheme.stop();

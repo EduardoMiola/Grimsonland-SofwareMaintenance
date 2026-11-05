@@ -33,7 +33,8 @@ O arquivo `apoio.cjs` permite carregar os arquivos TypeScript e fornece versões
 ## O que cada grupo confere
 
 - **Colisões:** sobreposição, bordas apenas encostadas, movimento, remoção e limpeza. Um dos cenários compara 108 combinações de tamanhos e distâncias; isso não significa 108 testes independentes de todo o jogo.
-- **Ondas:** estado inicial, intervalo de criação, transição da onda 1 para a 2, condição para não avançar e reposição quando monstros desaparecem.
+- **Pausa:** atualização parada, retomada, áudio, reinício, retorno ao menu e bloqueio após a derrota.
+- **Ondas:** estado inicial, intervalo de criação, transição, reposição, metas após a onda 12, teto, chefe periódico e limite de inimigos ativos.
 - **Dano e feitiços:** dano ao jogador e ao monstro, remoção de projétil, explosão, teclas de seleção e quantidade/força/intervalo da fireball.
 - **Pontuação:** morte de um monstro aumenta contadores e experiência; um monstro vivo não deve aumentá-los.
 - **Recordes:** leitura, valores ausentes ou inválidos, atualização quando há novo recorde e preservação quando não há melhora.
