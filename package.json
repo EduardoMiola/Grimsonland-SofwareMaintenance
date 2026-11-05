@@ -11,7 +11,7 @@
   "scripts": {
     "start": "yoshi start",
     "lint": "yoshi lint",
-    "test": "",
+    "test": "node tests/collisions.test.cjs",
     "build": "yoshi build",
     "release": "yoshi release"
   },

@@ -1,13 +1,17 @@
 import type { GameObject } from "./object";
 
+const DEFAULT_CELL_SHIFT = 6;
+const DEFAULT_WIDTH = 800;
+const DEFAULT_HEIGHT = 600;
+
 export const bootstrapCollisions = (config: {
   n: number;
   width: number;
   height: number;
 }) => {
-  const n = config.n || 6;
-  const width = config.width || 800;
-  const height = config.height || 600;
+  const n = config.n || DEFAULT_CELL_SHIFT;
+  const width = config.width || DEFAULT_WIDTH;
+  const height = config.height || DEFAULT_HEIGHT;
   const sizeX = width >> n;
   const sizeY = height >> n;
   const cellGrid = new Array(sizeX * sizeY);
@@ -52,6 +56,12 @@ export const bootstrapCollisions = (config: {
     return cells;
   };
 
+  const addToCell = (cell: number, object: GameObject) => {
+    cellGrid[cell] &&
+      cellGrid[cell].indexOf(object) === -1 &&
+      cellGrid[cell].push(object);
+  };
+
   const updateObject = (object: GameObject) => {
     const cells = getPointsOfObject(object);
     const oldCells = object.collisions.cells;
@@ -63,14 +73,10 @@ export const bootstrapCollisions = (config: {
             cellGrid[oldCells[i]].indexOf(object),
             1
           );
-        cellGrid[cells[i]] &&
-          cellGrid[cells[i]].indexOf(object) === -1 &&
-          cellGrid[cells[i]].push(object);
+        addToCell(cells[i], object);
         oldCells[i] = cells[i];
       } else {
-        cellGrid[cells[i]] &&
-          cellGrid[cells[i]].indexOf(object) === -1 &&
-          cellGrid[cells[i]].push(object);
+        addToCell(cells[i], object);
       }
     }
   };
@@ -78,25 +84,24 @@ export const bootstrapCollisions = (config: {
   const checkCollisions = () => {
     for (let i = 0; i <= sizeX; i++) {
       for (let j = 0; j <= sizeY; j++) {
-        if (cellGrid[getCell([i, j])]) {
-          const objects = cellGrid[getCell([i, j])];
-          const length = objects.length;
+        const objects = cellGrid[getCell([i, j])];
+        if (!objects) continue;
+        const length = objects.length;
 
-          for (let k = 0; k < length; k++) {
-            for (let l = k + 1; l < length; l++) {
-              if (
-                boxCollides(
-                  objects[k].pos,
-                  objects[k].size,
-                  objects[l].pos,
-                  objects[l].size
-                )
-              ) {
-                objects[k].collisions.objects.indexOf(objects[l]) === -1 &&
-                  objects[k].collisions.objects.push(objects[l]);
-                objects[l].collisions.objects.indexOf(objects[k]) === -1 &&
-                  objects[l].collisions.objects.push(objects[k]);
-              }
+        for (let k = 0; k < length; k++) {
+          for (let l = k + 1; l < length; l++) {
+            if (
+              boxCollides(
+                objects[k].pos,
+                objects[k].size,
+                objects[l].pos,
+                objects[l].size
+              )
+            ) {
+              objects[k].collisions.objects.indexOf(objects[l]) === -1 &&
+                objects[k].collisions.objects.push(objects[l]);
+              objects[l].collisions.objects.indexOf(objects[k]) === -1 &&
+                objects[l].collisions.objects.push(objects[k]);
             }
           }
         }
@@ -104,16 +109,12 @@ export const bootstrapCollisions = (config: {
     }
   };
 
-  const collides = (
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    x2: number,
-    y2: number,
-    width2: number,
-    height2: number
-  ) => x < x2 + width2 && x + width > x2 && y < y2 + height2 && y + height > y2;
+  type Rectangle = { x: number; y: number; width: number; height: number };
+  const collides = (first: Rectangle, second: Rectangle) =>
+    first.x < second.x + second.width &&
+    first.x + first.width > second.x &&
+    first.y < second.y + second.height &&
+    first.y + first.height > second.y;
 
   const boxCollides = (
     pos: Phaser.Point,
@@ -122,14 +123,18 @@ export const bootstrapCollisions = (config: {
     size2: number[]
   ) =>
     collides(
-      pos.x - size[0] / 2,
-      pos.y - size[1] / 2,
-      size[0],
-      size[1],
-      pos2.x - size2[0] / 2,
-      pos2.y - size2[1] / 2,
-      size2[0],
-      size2[1]
+      {
+        x: pos.x - size[0] / 2,
+        y: pos.y - size[1] / 2,
+        width: size[0],
+        height: size[1],
+      },
+      {
+        x: pos2.x - size2[0] / 2,
+        y: pos2.y - size2[1] / 2,
+        width: size2[0],
+        height: size2[1],
+      }
     );
 
   generateMap();
