@@ -14,13 +14,13 @@ Em seguida, dentro da pasta do projeto:
 
 ```bash
 npm test           # executa os cenários automatizados
-npm run build      # gera o jogo em dist/
+npm run build      # verifica os tipos e gera o jogo em dist/
 npm run servir     # abre um servidor local na porta 3188
 ```
 
 Acesse <http://127.0.0.1:3188/>. Para parar o servidor, pressione Ctrl+C no terminal. O navegador precisa de internet para baixar Phaser e Pixi dos endereços usados no `src/index.html`.
 
-O novo build substitui o comando Yoshi anterior, que procurava uma pasta `app` ausente. Ele compila o jogo com webpack e `ts-loader` em modo `transpileOnly`: **não verifica os tipos**. A checagem de tipos ainda precisa ser ajustada para as versões antigas do projeto e as declarações atuais de dependências. O comando `npm start` antigo também continua usando Yoshi; para abrir esta versão, use os comandos acima.
+O novo build substitui o comando Yoshi anterior, que procurava uma pasta `app` ausente. Ele primeiro verifica os tipos com `tsc --noEmit` e depois gera o jogo com webpack. As definições do Node estão fixadas na versão 14 para manter compatibilidade com o TypeScript do projeto. O comando `npm start` antigo também continua usando Yoshi; para abrir esta versão, use os comandos acima.
 
 ## Como entender os testes
 

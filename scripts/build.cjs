@@ -24,5 +24,4 @@ webpack(config, (erro, resultado) => {
   copiarPasta(path.join(raiz, 'src/assets'), path.join(destino, 'assets'));
   fs.copyFileSync(path.join(raiz, 'src/index.html'), path.join(destino, 'index.html'));
   console.log('Jogo gerado em dist/. Use npm run servir para abrir no navegador.');
-  console.log('O build transpila TypeScript sem verificar tipos; veja o README.');
 });
